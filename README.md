@@ -1,4 +1,3 @@
-#HW5
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -27,13 +26,13 @@
     }
     .form-container button {
       padding: 8px 16px;
-      background-color: #28a745;
+      background-color: #007bff;
       color: white;
       border: none;
       cursor: pointer;
     }
     .form-container button:hover {
-      background-color: #218838;
+      background-color: #0056b3;
     }
     table {
       margin: 0 auto;
@@ -52,18 +51,13 @@
 </head>
 <body>
 
-  <h1>Simulatore Payoff Opzioni</h1>
+  <h1>Simulatore Payoff Opzioni (Call)</h1>
 
   <div class="form-container">
     <input type="number" id="strike" placeholder="Strike">
     <input type="number" id="premio" placeholder="Premio">
     <input type="number" id="quantita" placeholder="Quantità">
     <input type="number" id="scadenza" placeholder="Scadenza (giorni)">
-    <input type="number" id="prezzo" placeholder="Prezzo sottostante attuale" value="100">
-    <select id="tipo">
-      <option value="call">Call</option>
-      <option value="put">Put</option>
-    </select>
     <select id="posizione">
       <option value="long">Long</option>
       <option value="short">Short</option>
@@ -75,7 +69,6 @@
     <table id="tabellaOpzioni">
       <thead>
         <tr>
-          <th>Tipo</th>
           <th>Strike</th>
           <th>Premio</th>
           <th>Quantità</th>
@@ -89,7 +82,17 @@
   </div>
 
   <div style="text-align: center;">
-    <button onclick="aggiornaGrafico()">Genera Grafico Payoff</button>
+    <label for="prezzo">Prezzo Attuale Sottostante:</label>
+    <input type="number" id="prezzo" value="100">
+  </div>
+
+  <div style="text-align: center; margin-top: 10px;">
+    <label for="giorniRiferimento">Giorni fino alla scadenza (data di riferimento):</label>
+    <input type="number" id="giorniRiferimento" value="0">
+  </div>
+
+  <div style="text-align: center; margin-top: 10px;">
+    <button onclick="aggiornaGrafico()">Aggiorna Grafico</button>
   </div>
 
   <canvas id="graficoPayoff" width="800" height="400"></canvas>
@@ -103,16 +106,14 @@
       const premio = parseFloat(document.getElementById("premio").value);
       const quantita = parseInt(document.getElementById("quantita").value);
       const scadenza = parseInt(document.getElementById("scadenza").value);
-      const prezzo = parseFloat(document.getElementById("prezzo").value);
-      const tipo = document.getElementById("tipo").value;
       const posizione = document.getElementById("posizione").value;
 
-      if (isNaN(strike) || isNaN(premio) || isNaN(quantita) || isNaN(scadenza) || isNaN(prezzo)) {
+      if (isNaN(strike) || isNaN(premio) || isNaN(quantita) || isNaN(scadenza)) {
         alert("Inserisci tutti i valori numerici!");
         return;
       }
 
-      opzioni.push({ strike, premio, quantita, scadenza, tipo, posizione, prezzo });
+      opzioni.push({ strike, premio, quantita, scadenza, tipo: "call", posizione });
       aggiornaTabella();
     }
 
@@ -126,7 +127,6 @@
       tbody.innerHTML = "";
       opzioni.forEach((opzione, i) => {
         const row = `<tr>
-          <td>${opzione.tipo.toUpperCase()}</td>
           <td>${opzione.strike}</td>
           <td>${opzione.premio}</td>
           <td>${opzione.quantita}</td>
@@ -140,50 +140,49 @@
 
     function calcolaPayoffOpzione(opzione, prezzi) {
       return prezzi.map(p => {
-        let payoff = 0;
-        if (opzione.tipo === "call") {
-          payoff = Math.max(0, p - opzione.strike) - opzione.premio;
-        } else if (opzione.tipo === "put") {
-          payoff = Math.max(0, opzione.strike - p) - opzione.premio;
-        }
+        let payoff = Math.max(0, p - opzione.strike) - opzione.premio;
         if (opzione.posizione === "short") payoff = -payoff;
         return payoff * opzione.quantita;
       });
     }
 
     function aggiornaGrafico() {
-      if (opzioni.length === 0) {
-        alert("Aggiungi almeno un'opzione prima di generare il grafico.");
+      const prezzoAttuale = parseFloat(document.getElementById("prezzo").value);
+      const giorniRiferimento = parseInt(document.getElementById("giorniRiferimento").value);
+
+      if (isNaN(prezzoAttuale) || isNaN(giorniRiferimento)) {
+        alert("Inserisci un prezzo attuale e una data di riferimento validi.");
         return;
       }
 
-      const prezzoBase = opzioni[0].prezzo; // Usa il prezzo del sottostante dalla prima opzione
       const prezzi = [];
-      const min = prezzoBase - 50, max = prezzoBase + 50, step = 5;
+      const min = prezzoAttuale - 50, max = prezzoAttuale + 50, step = 5;
       for (let p = min; p <= max; p += step) prezzi.push(p);
 
       const datasets = [];
       let payoffTotale = prezzi.map(() => 0);
 
       opzioni.forEach((opzione, idx) => {
-        const payoff = calcolaPayoffOpzione(opzione, prezzi);
-        payoffTotale = payoffTotale.map((val, i) => val + payoff[i]);
+        if (opzione.scadenza >= giorniRiferimento) {
+          const payoff = calcolaPayoffOpzione(opzione, prezzi);
+          payoffTotale = payoffTotale.map((val, i) => val + payoff[i]);
 
-        datasets.push({
-          label: ${opzione.tipo.toUpperCase()} ${opzione.posizione} @${opzione.strike} (${opzione.scadenza}gg),
-          data: payoff,
-          borderColor: colori[idx % colori.length],
-          borderWidth: 2,
-          fill: false
-        });
+          datasets.push({
+            label: Call ${opzione.posizione} @${opzione.strike} (${opzione.scadenza}gg),
+            data: payoff,
+            borderColor: colori[idx % colori.length],
+            borderWidth: 2,
+            fill: false
+          });
+        }
       });
 
       datasets.push({
-        label: "Payoff Totale",
+        label: Payoff Totale (≥ ${giorniRiferimento}gg),
         data: payoffTotale,
         borderColor: "black",
-        borderDash: [5, 5],
         borderWidth: 2,
+        borderDash: [5, 5],
         fill: false
       });
 
